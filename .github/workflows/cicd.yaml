@@ -30,10 +30,6 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Extract unique tag (short commit SHA)
-        id: meta
-        run: echo "TAG=${{ github.sha }}" >> $GITHUB_OUTPUT
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -43,22 +39,23 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/shopping-bill-app:${{ github.sha }}
             ${{ secrets.DOCKER_USERNAME }}/shopping-bill-app:latest
 
-      - name: Set up Kubernetes (kubectl)
-        uses: azure/setup-kubectl@v3
+      - name: Start Local Kubernetes Cluster (Minikube)
+        uses: medyagh/setup-minikube@master
+        with:
+          minikube-version: 'latest'
+          driver: docker
+          kubernetes-version: 'v1.28.0'
 
       - name: Deploy to Kubernetes
         run: |
-          # 1. Create the default .kube directory structure in the runner
-          mkdir -p $HOME/.kube
-          
-          # 2. Write the cluster configuration secret directly to the default config path
-          echo "${{ secrets.KUBECONFIG_DATA }}" > $HOME/.kube/config
-          
-          # 3. Export the short tag variant for configuration mapping
+          # 1. Export the image tag variant for substitution
           export IMAGE_TAG=${{ github.sha }}
           
-          # 4. Perform configuration substitution and apply deployment using the local config
-          envsubst < k8s-deployment.yaml | kubectl apply --validate=false -f -
+          # 2. Perform configuration substitution and apply deployment to the running cluster
+          envsubst < k8s-deployment.yaml | kubectl apply -f -
           
-          # 5. Securely wipe the cluster configuration out of the runner environment
-          rm -rf $HOME/.kube
+          # 3. Verify the deployment status to ensure it ran successfully
+          echo "=== Verifying Kubernetes Objects ==="
+          kubectl get deployments
+          kubectl get pods
+          kubectl get services
