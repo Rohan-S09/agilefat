@@ -1,9 +1,4 @@
-      - name: Deploy to Kubernetes
-        run: |
-          echo "${{ secrets.KUBECONFIG_DATA }}" > kubeconfig.yaml
-          export IMAGE_TAG=${{ steps.meta.outputs.TAG }}
-          envsubst < k8s-deployment.yaml | kubectl apply --kubeconfig=kubeconfig.yaml -f -
-
+name: CI/CD Pipeline for Shopping Bill App
 
 on:
   push:
@@ -45,18 +40,22 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/shopping-bill-app:${{ steps.meta.outputs.TAG }}
+            ${{ secrets.DOCKER_USERNAME }}/shopping-bill-app:${{ github.sha }}
             ${{ secrets.DOCKER_USERNAME }}/shopping-bill-app:latest
 
       - name: Set up Kubernetes (kubectl)
         uses: azure/setup-kubectl@v3
 
-      - name: Configure Kubernetes context
-        run: |
-          echo "${{ secrets.KUBECONFIG_DATA }}" > kubeconfig.yaml
-          export KUBECONFIG=kubeconfig.yaml
-
       - name: Deploy to Kubernetes
         run: |
-          export IMAGE_TAG=${{ steps.meta.outputs.TAG }}
-          envsubst < k8s-deployment.yaml | kubectl apply -f -
+          # 1. Recreate the kubeconfig file from the GitHub secret
+          echo "${{ secrets.KUBECONFIG_DATA }}" > kubeconfig.yaml
+          
+          # 2. Export the exact image tag for envsubst to parse
+          export IMAGE_TAG=${{ github.sha }}
+          
+          # 3. Substitute variables and apply explicitly passing the kubeconfig file path
+          envsubst < k8s-deployment.yaml | kubectl apply --kubeconfig=kubeconfig.yaml -f -
+          
+          # 4. Clean up the sensitive config file from the runner workspace
+          rm kubeconfig.yaml
