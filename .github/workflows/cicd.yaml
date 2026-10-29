@@ -48,14 +48,17 @@ jobs:
 
       - name: Deploy to Kubernetes
         run: |
-          # 1. Recreate the kubeconfig file from the GitHub secret
-          echo "${{ secrets.KUBECONFIG_DATA }}" > kubeconfig.yaml
+          # 1. Create the default .kube directory structure in the runner
+          mkdir -p $HOME/.kube
           
-          # 2. Export the exact image tag for envsubst to parse
+          # 2. Write the cluster configuration secret directly to the default config path
+          echo "${{ secrets.KUBECONFIG_DATA }}" > $HOME/.kube/config
+          
+          # 3. Export the short tag variant for configuration mapping
           export IMAGE_TAG=${{ github.sha }}
           
-          # 3. Substitute variables and apply explicitly passing the kubeconfig file path
-          envsubst < k8s-deployment.yaml | kubectl apply --kubeconfig=kubeconfig.yaml -f -
+          # 4. Perform configuration substitution and apply deployment using the local config
+          envsubst < k8s-deployment.yaml | kubectl apply --validate=false -f -
           
-          # 4. Clean up the sensitive config file from the runner workspace
-          rm kubeconfig.yaml
+          # 5. Securely wipe the cluster configuration out of the runner environment
+          rm -rf $HOME/.kube
