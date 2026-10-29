@@ -1,4 +1,9 @@
-name: CI/CD Pipeline for Shopping Bill App
+      - name: Deploy to Kubernetes
+        run: |
+          echo "${{ secrets.KUBECONFIG_DATA }}" > kubeconfig.yaml
+          export IMAGE_TAG=${{ steps.meta.outputs.TAG }}
+          envsubst < k8s-deployment.yaml | kubectl apply --kubeconfig=kubeconfig.yaml -f -
+
 
 on:
   push:
